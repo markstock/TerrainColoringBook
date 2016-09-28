@@ -10,6 +10,9 @@ my $inWide = 8.0;
 my $inHigh = 10.5;
 my $desiredAR = $inWide / $inHigh;
 
+# thumbnail size
+my $ythumb = 200;
+
 my $nargs = @ARGV;
 if ($nargs < 2) {
   print "Need source and destination directories on the command-line:\n";
@@ -52,6 +55,10 @@ system $command;
 #my $command = "pamgauss 29 29 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss10.pgm";
 #system $command;
 
+# write the html file new every time
+my $htmlfile = "${outdir}/index.html";
+open(HTML,">${htmlfile}") or die "Can't open ${htmlfile}: $!";
+
 # get all the images
 @infiles = glob("${indir}/*.png");
 
@@ -62,111 +69,149 @@ foreach my $infile (@infiles) {
   # assemble the output file name
 
   my @tokens = split('/',$infile);
+  my $rootname = $tokens[1];
+  $rootname =~ s/.png//;
   my $outfile = "${outdir}/$tokens[1]";
+  print "Creating ${outfile}\n";
 
-  # get the pixel size of the image
-  my @res = &findres($infile);
-  print "res is @res \n";
-  my $xres = $res[0];
-  my $yres = $res[1];
-  my $maxres = $res[2];
-  if ($maxres == -1) { }
-  my $fileAR = (1.0 * $xres) / $yres;
+  # does outfile exist?
+  if (! -f "$outfile") {
 
-  # first, blur and crop the input image
-  my $command = "cat ${infile}";
-  $command .= " | pngtopam | ppmtopgm";
-  $command .= " | pnmconvol -nooffset .gauss7.pgm";
-  my $buf = 15;
-  my $newx = $xres - 2*$buf;
-  my $newy = $yres - 2*$buf;
-  $xres = $newx;
-  $yres = $newy;
-  my $fileAR = (1.0 * $xres) / $yres;
-  $command .= " | pamcut -width $xres -height $yres -left $buf -top $buf";
-  $command .= " > .temp.pgm";
-  print "${command}\n"; system $command;
+    # get the pixel size of the image
+    my @res = &findres($infile);
+    print "res is @res \n";
+    my $xres = $res[0];
+    my $yres = $res[1];
+    my $maxres = $res[2];
+    if ($maxres == -1) { }
+    my $fileAR = (1.0 * $xres) / $yres;
 
-  # what should be our minimum file size?
-  my $minFileSize = 20000 + $xres*$yres/30;
+    # first, blur and crop the input image
+    my $command = "cat ${infile}";
+    $command .= " | pngtopam | ppmtopgm";
+    $command .= " | pnmconvol -nooffset .gauss7.pgm";
+    my $buf = 15;
+    my $newx = $xres - 2*$buf;
+    my $newy = $yres - 2*$buf;
+    $xres = $newx;
+    $yres = $newy;
+    my $fileAR = (1.0 * $xres) / $yres;
+    $command .= " | pamcut -width $xres -height $yres -left $buf -top $buf";
+    $command .= " > .temp.pgm";
+    print "${command}\n"; system $command;
 
-  # try multiple times to match a specific file size
-  my $levels = 3;
-  my $keepgoing = 1;
-  while ($keepgoing) {
+    # what should be our minimum file size?
+    my $minFileSize = 20000 + $xres*$yres/30;
 
-    # assemble the command
-    #my $command = "cat ${infile}";
-    my $command = "cat .temp.pgm";
+    # try multiple times to match a specific file size
+    my $levels = 3;
+    my $keepgoing = 1;
+    while ($keepgoing) {
 
-    # convert to greyscale pnm
-    #$command .= " | pngtopam | ppmtopgm";
+      # assemble the command
+      #my $command = "cat ${infile}";
+      my $command = "cat .temp.pgm";
 
-    # blur the input image
-    #$command .= " | pnmconvol -nooffset .gauss7.pgm";
+      # convert to greyscale pnm
+      #$command .= " | pngtopam | ppmtopgm";
 
-    # do a posterize operation
-    $command .= " | pnmquant $levels";
+      # blur the input image
+      #$command .= " | pnmconvol -nooffset .gauss7.pgm";
 
-    # blur here?
-    $command .= " | pnmconvol -nooffset .gauss0.pgm";
+      # do a posterize operation
+      $command .= " | pnmquant $levels";
 
-    # find edges and convert
-    $command .= " | pamedge | pnminvert | pnmnorm -bpercent 5";
-    #$command .= " | pamedge | pnminvert";
+      # blur here?
+      $command .= " | pnmconvol -nooffset .gauss0.pgm";
 
-    # to 8-bit
-    $command .= " | pnmdepth 255";
+      # find edges and convert
+      $command .= " | pamedge | pnminvert | pnmnorm -bpercent 5";
+      #$command .= " | pamedge | pnminvert";
 
-    # rotate
-    if ($xres > $yres) {
-      $command .= " | pamflip -ccw";
-    }
+      # to 8-bit
+      $command .= " | pnmdepth 255";
 
-    # crop (this needs to be more adaptive)
-    if ($xres > $yres) {
-      my $desiredx = int($desiredAR * $xres);
-      if ($desiredx > $yres) {
-        my $desiredy = int($yres / $desiredAR);
-        # crop in y
-        $command .= " | pamcut -width $yres -height $desiredy";
-      } else {
-        # crop in x
-        $command .= " | pamcut -width $desiredx -height $xres";
+      # rotate
+      if ($xres > $yres) {
+        $command .= " | pamflip -ccw";
       }
 
-    } else {
-      my $desiredx = int($desiredAR * $yres);
-      if ($desiredx > $xres) {
-        my $desiredy = int($xres / $desiredAR);
-        # crop in y
-        $command .= " | pamcut -width $xres -height $desiredy";
+      # crop (this needs to be more adaptive)
+      if ($xres > $yres) {
+        my $desiredx = int($desiredAR * $xres);
+        if ($desiredx > $yres) {
+          my $desiredy = int($yres / $desiredAR);
+          # crop in y
+          $command .= " | pamcut -width $yres -height $desiredy";
+        } else {
+          # crop in x
+          $command .= " | pamcut -width $desiredx -height $xres";
+        }
+
       } else {
-        # crop in x
-        $command .= " | pamcut -width $desiredx -height $yres";
+        my $desiredx = int($desiredAR * $yres);
+        if ($desiredx > $xres) {
+          my $desiredy = int($xres / $desiredAR);
+          # crop in y
+          $command .= " | pamcut -width $xres -height $desiredy";
+        } else {
+          # crop in x
+          $command .= " | pamcut -width $desiredx -height $yres";
+        }
       }
+
+      # write out
+      $command .= " | pnmtopng > ${outfile}";
+
+      print "${command}\n";
+      system $command;
+
+      # how large is the file?
+      my $size = -s $outfile;
+      print "  $levels levels gives file size of $size bytes\n\n";
+
+      # is this big enough?
+      if ($size > $minFileSize) {
+        $keepgoing = 0;
+      }
+      $levels += 1;
     }
+  }
 
-    # write out
-    $command .= " | pnmtopng > ${outfile}";
+  # make a PDF?
+  my $pdfname = $outfile;
+  $pdfname =~ s/png/pdf/;
+  if (! -f "${pdfname}") {
+  }
 
+
+  # thumbnail image file name
+  my $thumbname = $outfile;
+  $thumbname =~ s/.png/_th.jpg/;
+
+  # does thumbnail exist?
+  if (! -f "${thumbname}") {
+    print "Making thumbnail ${thumbname}\n";
+
+    my $command = "cat ${outfile}";
+    $command .= " | pngtopam | ppmtopgm";
+    $command .= " | pamscale -ysize ${ythumb} | ppmtopgm";
+    #$command .= " | pnmnorm -bpercent 1";
+    $command .= " | pnmnorm -bvalue 160";
+    $command .= " | cjpeg -q 90 > ${thumbname}";
     print "${command}\n";
     system $command;
-
-    # how large is the file?
-    my $size = -s $outfile;
-    print "  $levels levels gives file size of $size bytes\n\n";
-
-    # is this big enough?
-    if ($size > $minFileSize) {
-      $keepgoing = 0;
-    }
-    $levels += 1;
   }
+
+
+  # write the html file new every time
+  print HTML "<a href=\"${rootname}.png\"><img src=\"${rootname}_th.jpg\"></a>";
 
   #exit(0);
 }
 
+# close the html
+close(HTML);
 
 sub findres {
 
