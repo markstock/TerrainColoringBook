@@ -10,8 +10,9 @@ my $inWide = 8.0;
 my $inHigh = 10.5;
 my $desiredAR = $inWide / $inHigh;
 
-# thumbnail size
-my $ythumb = 200;
+# thumbnail size, in vertical dimension, and border size
+my $ythumb = 220;
+my $bthumb = 10;
 
 my $nargs = @ARGV;
 if ($nargs < 2) {
@@ -209,7 +210,9 @@ foreach my $infile (@infiles) {
 
     my $command = "cat ${outfile}";
     $command .= " | pngtopam | ppmtopgm";
-    $command .= " | pamscale -ysize ${ythumb} | ppmtopgm";
+    $command .= " | pamscale -ysize ${ythumb}";
+    $command .= " | pnmmargin -white ${bthumb}";
+    $command .= " | ppmtopgm";
     #$command .= " | pnmnorm -bpercent 1";
     $command .= " | pnmnorm -bvalue 160";
     $command .= " | cjpeg -q 90 > ${thumbname}";
