@@ -7,7 +7,7 @@ I happen to love maps and landscape data, so I created an automated method to co
 digital elevation models (or any greyscale image, for that matter) into a color-able 
 coloring book image.
 
-(https://markstock.github.io/TerrainColoringBook/)[View the web site here.]
+[View the web site here.](https://markstock.github.io/TerrainColoringBook/)
 
 ### Usage
 Before using the included Perl script, you'll need to make sure that the NetPBM and 
