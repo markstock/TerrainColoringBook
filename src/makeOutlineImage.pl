@@ -40,7 +40,7 @@ if (! -d ${outdir}) {
 
 # make a smoothing kernel
 #my $command = "pamgauss 5 5 -sigma 1.3 -tupletype=GRAYSCALE | pamtopnm > .gauss.pgm";
-my $command = "pamgauss 3 3 -sigma 0.5 -tupletype=GRAYSCALE | pamtopnm > .gauss0.pgm";
+my $command = "pamgauss 3 3 -sigma 0.5 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss0.pgm";
 system $command;
 #my $command = "pamgauss 5 5 -sigma 0.8 -tupletype=GRAYSCALE | pamtopnm > .gauss1.pgm";
 #system $command;
@@ -48,7 +48,7 @@ system $command;
 #system $command;
 #my $command = "pamgauss 17 17 -sigma 4.0 -tupletype=GRAYSCALE | pamtopnm > .gauss4.pgm";
 #system $command;
-my $command = "pamgauss 21 21 -sigma 7.0 -tupletype=GRAYSCALE | pamtopnm > .gauss7.pgm";
+my $command = "pamgauss 21 21 -sigma 7.0 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss7.pgm";
 system $command;
 #my $command = "pamgauss 23 23 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss9.pgm";
 #system $command;
@@ -89,7 +89,7 @@ foreach my $infile (@infiles) {
     # first, blur and crop the input image
     my $command = "cat ${infile}";
     $command .= " | pngtopam | ppmtopgm";
-    $command .= " | pnmconvol -nooffset .gauss7.pgm";
+    $command .= " | pnmconvol -nooffset ${outdir}/.gauss7.pgm";
     my $buf = 15;
     my $newx = $xres - 2*$buf;
     my $newy = $yres - 2*$buf;
@@ -97,7 +97,7 @@ foreach my $infile (@infiles) {
     $yres = $newy;
     my $fileAR = (1.0 * $xres) / $yres;
     $command .= " | pamcut -width $xres -height $yres -left $buf -top $buf";
-    $command .= " > .temp.pgm";
+    $command .= " > ${outdir}/.temp.pgm";
     print "${command}\n"; system $command;
 
     # what should be our minimum file size?
@@ -106,23 +106,24 @@ foreach my $infile (@infiles) {
     # try multiple times to match a specific file size
     my $levels = 3;
     my $keepgoing = 1;
+    my $lastsize = 0;
     while ($keepgoing) {
 
       # assemble the command
       #my $command = "cat ${infile}";
-      my $command = "cat .temp.pgm";
+      my $command = "cat ${outdir}/.temp.pgm";
 
       # convert to greyscale pnm
       #$command .= " | pngtopam | ppmtopgm";
 
       # blur the input image
-      #$command .= " | pnmconvol -nooffset .gauss7.pgm";
+      #$command .= " | pnmconvol -nooffset ${outdir}/.gauss7.pgm";
 
       # do a posterize operation
       $command .= " | pnmquant $levels";
 
       # blur here?
-      $command .= " | pnmconvol -nooffset .gauss0.pgm";
+      $command .= " | pnmconvol -nooffset ${outdir}/.gauss0.pgm";
 
       # find edges and convert
       $command .= " | pamedge | pnminvert | pnmnorm -bpercent 5";
@@ -174,6 +175,18 @@ foreach my $infile (@infiles) {
       if ($size > $minFileSize) {
         $keepgoing = 0;
       }
+
+      # did we try enough?
+      if ($levels > 50) {
+        $keepgoing = 0;
+      }
+
+      # did file size *decrease*?
+      if ($size < $lastsize - 100) {
+        $keepgoing = 0;
+      }
+      $lastsize = $size;
+
       $levels += 1;
     }
   }
@@ -187,7 +200,8 @@ foreach my $infile (@infiles) {
 
   # thumbnail image file name
   my $thumbname = $outfile;
-  $thumbname =~ s/.png/_th.jpg/;
+  $thumbname =~ s/\//\/thumb_/;
+  $thumbname =~ s/png/jpg/;
 
   # does thumbnail exist?
   if (! -f "${thumbname}") {
@@ -205,7 +219,7 @@ foreach my $infile (@infiles) {
 
 
   # write the html file new every time
-  print HTML "<a href=\"${rootname}.png\"><img src=\"${rootname}_th.jpg\"></a>";
+  print HTML "<a href=\"${rootname}.png\"><img src=\"thumb_${rootname}.jpg\"></a>";
 
   #exit(0);
 }
