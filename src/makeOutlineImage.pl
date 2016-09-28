@@ -222,7 +222,7 @@ foreach my $infile (@infiles) {
 
 
   # write the html file new every time
-  print HTML "<a href=\"${rootname}.png\"><img src=\"thumb_${rootname}.jpg\"></a>";
+  print HTML "<a href=\"${rootname}.png\"><img src=\"thumb_${rootname}.jpg\"></a>\n";
 
   #exit(0);
 }
