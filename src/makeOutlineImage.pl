@@ -39,21 +39,29 @@ if (! -d ${outdir}) {
   mkdir $outdir;
 }
 
-# make a smoothing kernel
-#my $command = "pamgauss 5 5 -sigma 1.3 -tupletype=GRAYSCALE | pamtopnm > .gauss.pgm";
-my $command = "pamgauss 3 3 -sigma 0.5 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss0.pgm";
+my $command = "";
+# make a series of smoothing kernels
+for (my $r=1; $r<20; $r++) {
+
+  my $res = 2 * $r + 1;
+  my $sig = $r / 1.5;
+  $command = "pamgauss $res $res -sigma $sig -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss${r}.pgm";
+}
+
+#$command = "pamgauss 5 5 -sigma 1.3 -tupletype=GRAYSCALE | pamtopnm > .gauss.pgm";
+$command = "pamgauss 3 3 -sigma 0.5 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss0.pgm";
 system $command;
-#my $command = "pamgauss 5 5 -sigma 0.8 -tupletype=GRAYSCALE | pamtopnm > .gauss1.pgm";
+#$command = "pamgauss 5 5 -sigma 0.8 -tupletype=GRAYSCALE | pamtopnm > .gauss1.pgm";
 #system $command;
-#my $command = "pamgauss 9 9 -sigma 2.2 -tupletype=GRAYSCALE | pamtopnm > .gauss2.pgm";
+#$command = "pamgauss 9 9 -sigma 2.2 -tupletype=GRAYSCALE | pamtopnm > .gauss2.pgm";
 #system $command;
-#my $command = "pamgauss 17 17 -sigma 4.0 -tupletype=GRAYSCALE | pamtopnm > .gauss4.pgm";
+#$command = "pamgauss 17 17 -sigma 4.0 -tupletype=GRAYSCALE | pamtopnm > .gauss4.pgm";
 #system $command;
-my $command = "pamgauss 21 21 -sigma 7.0 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss7.pgm";
+$command = "pamgauss 21 21 -sigma 7.0 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss7.pgm";
 system $command;
-#my $command = "pamgauss 23 23 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss9.pgm";
+#$command = "pamgauss 23 23 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss9.pgm";
 #system $command;
-#my $command = "pamgauss 29 29 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss10.pgm";
+#$command = "pamgauss 29 29 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss10.pgm";
 #system $command;
 
 # write the html file new every time
@@ -91,7 +99,7 @@ foreach my $infile (@infiles) {
     my $command = "cat ${infile}";
     $command .= " | pngtopam | ppmtopgm";
     $command .= " | pnmconvol -nooffset ${outdir}/.gauss7.pgm";
-    my $buf = 15;
+    my $buf = 20;
     my $newx = $xres - 2*$buf;
     my $newy = $yres - 2*$buf;
     $xres = $newx;
@@ -101,8 +109,9 @@ foreach my $infile (@infiles) {
     $command .= " > ${outdir}/.temp.pgm";
     print "${command}\n"; system $command;
 
-    # what should be our minimum file size?
-    my $minFileSize = 20000 + $xres*$yres/30;
+    # what should be our minimum file size to maintain complexity
+    # anything from 0.1 to 0.3 is reasonable
+    my $minBpp = 0.2;
 
     # try multiple times to match a specific file size
     my $levels = 3;
@@ -169,11 +178,13 @@ foreach my $infile (@infiles) {
       system $command;
 
       # how large is the file?
-      my $size = -s $outfile;
-      print "  $levels levels gives file size of $size bytes\n\n";
+      my $size = &CalcFileComplexity($outfile);
+      print "  $levels levels gives $size bytes per pixel\n\n";
+      #my $size = -s $outfile;
+      #print "  $levels levels gives file size of $size bytes\n\n";
 
       # is this big enough?
-      if ($size > $minFileSize) {
+      if ($size > $minBpp) {
         $keepgoing = 0;
       }
 
@@ -214,7 +225,7 @@ foreach my $infile (@infiles) {
     $command .= " | pnmmargin -white ${bthumb}";
     $command .= " | ppmtopgm";
     #$command .= " | pnmnorm -bpercent 1";
-    $command .= " | pnmnorm -bvalue 160";
+    $command .= " | pnmnorm -bvalue 170";
     $command .= " | cjpeg -q 90 > ${thumbname}";
     print "${command}\n";
     system $command;
@@ -229,6 +240,13 @@ foreach my $infile (@infiles) {
 
 # close the html
 close(HTML);
+
+# clean up temporaries
+unlink glob("*.pgm");
+
+exit;
+
+# ===================================================
 
 sub findres {
 
@@ -251,3 +269,27 @@ sub findres {
 
   return ($xsize, $ysize, $maxsize);
 }
+
+sub CalcFileComplexity {
+  my $infile = $_[0];
+
+  # first, find actual image resolution
+  my ($xs, $ys, $dummy) = &findres($infile);
+
+  # find jpeg file size
+  my $tmpjpg = $infile;
+  $tmpjpg =~ s/png/jpg/;
+  my $command = "pngtopam $infile | ppmtopgm | cjpeg -q 90 > $tmpjpg";
+  print "  $command\n"; system $command;
+
+  # calculate file size
+  my $size = -s $tmpjpg;
+  unlink $tmpjpg;
+  print "  size is $xs * $ys / $size\n";
+
+  # and complexity
+  my $bpp = $size / (($xs+1.0)*($ys+1.0));
+
+  return ($bpp);
+}
+
