@@ -9,6 +9,8 @@ coloring book image.
 
 [View the web site here.](https://markstock.github.io/TerrainColoringBook/)
 
+![before](sample_N00E024_a_orig.jpg "before") ![after](sample_N00E024_a_page.jpg "after")
+
 ### Usage
 Before using the included Perl script, you'll need to make sure that the NetPBM and 
 TurboJPEG packages are installed and in the user's path. You can do this on an RPM system
