@@ -41,28 +41,12 @@ if (! -d ${outdir}) {
 
 my $command = "";
 # make a series of smoothing kernels
-for (my $r=1; $r<20; $r++) {
-
+for (my $r=1; $r<25; $r++) {
   my $res = 2 * $r + 1;
   my $sig = $r / 1.5;
-  $command = "pamgauss $res $res -sigma $sig -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss${r}.pgm";
+  $command = "pamgauss $res $res -sigma $sig -tupletype=GRAYSCALE -maxval=65535 | pamtopnm > ${outdir}/.gauss${r}.pgm";
+  system $command;
 }
-
-#$command = "pamgauss 5 5 -sigma 1.3 -tupletype=GRAYSCALE | pamtopnm > .gauss.pgm";
-$command = "pamgauss 3 3 -sigma 0.5 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss0.pgm";
-system $command;
-#$command = "pamgauss 5 5 -sigma 0.8 -tupletype=GRAYSCALE | pamtopnm > .gauss1.pgm";
-#system $command;
-#$command = "pamgauss 9 9 -sigma 2.2 -tupletype=GRAYSCALE | pamtopnm > .gauss2.pgm";
-#system $command;
-#$command = "pamgauss 17 17 -sigma 4.0 -tupletype=GRAYSCALE | pamtopnm > .gauss4.pgm";
-#system $command;
-$command = "pamgauss 21 21 -sigma 7.0 -tupletype=GRAYSCALE | pamtopnm > ${outdir}/.gauss7.pgm";
-system $command;
-#$command = "pamgauss 23 23 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss9.pgm";
-#system $command;
-#$command = "pamgauss 29 29 -sigma 10.0 -tupletype=GRAYSCALE | pamtopnm > .gauss10.pgm";
-#system $command;
 
 # write the html file new every time
 my $htmlfile = "${outdir}/index.html";
@@ -70,6 +54,9 @@ open(HTML,">${htmlfile}") or die "Can't open ${htmlfile}: $!";
 
 # get all the images
 @infiles = glob("${indir}/*.png");
+
+# seed random number generator
+srand(scalar @infiles);
 
 # for each image in the input...
 foreach my $infile (@infiles) {
@@ -98,8 +85,10 @@ foreach my $infile (@infiles) {
     # first, blur and crop the input image
     my $command = "cat ${infile}";
     $command .= " | pngtopam | ppmtopgm";
-    $command .= " | pnmconvol -nooffset ${outdir}/.gauss7.pgm";
-    my $buf = 20;
+    # randomized smoothing
+    my $smo = int(6 + rand(16));
+    $command .= " | pnmconvol -nooffset ${outdir}/.gauss${smo}.pgm";
+    my $buf = 25;
     my $newx = $xres - 2*$buf;
     my $newy = $yres - 2*$buf;
     $xres = $newx;
@@ -111,7 +100,9 @@ foreach my $infile (@infiles) {
 
     # what should be our minimum file size to maintain complexity
     # anything from 0.1 to 0.3 is reasonable
-    my $minBpp = 0.2;
+    #my $minBpp = 0.2;
+    # smoother images need less information content
+    my $minBpp = 0.12 + 0.16*rand() - 0.01*($smo-14);
 
     # try multiple times to match a specific file size
     my $levels = 3;
@@ -133,7 +124,7 @@ foreach my $infile (@infiles) {
       $command .= " | pnmquant $levels";
 
       # blur here?
-      $command .= " | pnmconvol -nooffset ${outdir}/.gauss0.pgm";
+      $command .= " | pnmconvol -nooffset ${outdir}/.gauss1.pgm";
 
       # find edges and convert
       $command .= " | pamedge | pnminvert | pnmnorm -bpercent 5";
@@ -225,7 +216,7 @@ foreach my $infile (@infiles) {
     $command .= " | pnmmargin -white ${bthumb}";
     $command .= " | ppmtopgm";
     #$command .= " | pnmnorm -bpercent 1";
-    $command .= " | pnmnorm -bvalue 170";
+    $command .= " | pnmnorm -bvalue 180";
     $command .= " | cjpeg -q 90 > ${thumbname}";
     print "${command}\n";
     system $command;
@@ -242,7 +233,7 @@ foreach my $infile (@infiles) {
 close(HTML);
 
 # clean up temporaries
-unlink glob("*.pgm");
+unlink glob("${outdir}/.*pgm");
 
 exit;
 
