@@ -102,7 +102,7 @@ foreach my $infile (@infiles) {
     # anything from 0.1 to 0.3 is reasonable
     #my $minBpp = 0.2;
     # smoother images need less information content
-    my $minBpp = 0.12 + 0.16*rand() - 0.01*($smo-14);
+    my $minBpp = 0.11 + 0.15*rand() - 0.008*($smo-14);
 
     # try multiple times to match a specific file size
     my $levels = 3;
@@ -216,7 +216,7 @@ foreach my $infile (@infiles) {
     $command .= " | pnmmargin -white ${bthumb}";
     $command .= " | ppmtopgm";
     #$command .= " | pnmnorm -bpercent 1";
-    $command .= " | pnmnorm -bvalue 180";
+    $command .= " | pnmnorm -bvalue 160";
     $command .= " | cjpeg -q 90 > ${thumbname}";
     print "${command}\n";
     system $command;
